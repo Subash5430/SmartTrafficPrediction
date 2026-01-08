@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Accident Risk Predictor</title>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f0f7ff;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #003366;
+      overflow: hidden; 
+      position: relative;
+    }
+
+    /* Radar Background logic */
+    .radar-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 0;
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(0, 123, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 123, 255, 0.08) 1px, transparent 1px);
+      background-size: 60px 60px;
+      z-index: 1;
+    }
+
+    .search-origin {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background-color: rgba(0, 123, 255, 0.8);
+        border-radius: 50%;
+        z-index: 2;
+        box-shadow: 0 0 20px rgba(0, 123, 255, 1);
+        animation: originPulse 4s infinite ease-in-out;
+    }
+
+    .ripple {
+      position: absolute;
+      border: 2px solid rgba(0, 110, 255, 0.6);
+      border-radius: 50%;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      animation: rippleSearch 8s infinite ease-out; 
+    }
+
+    .ripple:nth-child(2) { animation-delay: 0s; }
+    .ripple:nth-child(3) { animation-delay: 2s; }
+    .ripple:nth-child(4) { animation-delay: 4s; }
+    .ripple:nth-child(5) { animation-delay: 6s; }
+
+    .radar-blip {
+        position: absolute;
+        width: 8px;
+        height: 8px;
+        background-color: #007bff;
+        border-radius: 50%;
+        opacity: 0;
+        box-shadow: 0 0 10px #007bff;
+        animation: blipPop 6s infinite;
+    }
+    
+    .blip-1 { top: 30%; left: 40%; animation-delay: 1.5s; }
+    .blip-2 { top: 75%; left: 70%; animation-delay: 4.5s; }
+
+    @keyframes originPulse {
+        0%, 100% { transform: scale(1); opacity: 0.7; }
+        50% { transform: scale(1.5); opacity: 1; box-shadow: 0 0 35px rgba(0, 123, 255, 0.8); }
+    }
+
+    @keyframes rippleSearch {
+      0% { width: 0; height: 0; opacity: 0; border-width: 4px; }
+      5% { opacity: 1; }
+      100% { width: 150vmax; height: 150vmax; opacity: 0; border-width: 1px; }
+    }
+
+    @keyframes blipPop {
+        0%, 100% { transform: scale(0); opacity: 0; }
+        50% { transform: scale(1.5); opacity: 1; }
+    }
+
+    /* Layout Wrapper */
+    .layout-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      width: 90%;
+      max-width: 1400px;
+      transition: all 0.8s ease;
+    }
+
+    .card {
+      position: relative;
+      background: rgba(255, 255, 255, 0.7); 
+      backdrop-filter: blur(8px);
+      padding: 30px;
+      width: 450px; 
+      border-radius: 20px;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      flex-shrink: 0;
+    }
+
+    /* MOVE LEFT STATE */
+    .card.move-left {
+      transform: translateX(-50px);
+    }
+
+    /* INCREASED SIZE FOR RESULT PANEL */
+    .result-panel {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      transform: translateX(100px);
+      transition: all 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .card.move-left + .result-panel {
+      opacity: 1;
+      width: 700px; /* Large width for map and result */
+      height: auto;
+      transform: translateX(0);
+      pointer-events: auto;
+      margin-left: 40px;
+    }
+
+    .nav-link { position: absolute; top: 20px; left: 20px; text-decoration: none; color: #007bff; font-weight: 600; font-size: 0.9rem; }
+    h1 { text-align: center; color: #0056b3; margin: 10px 0 5px 0; font-size: 1.8rem; }
+    .subtitle { text-align: center; font-size: 0.9rem; margin-bottom: 25px; color: #557799; }
+    .input-group { margin-bottom: 15px; }
+    label { font-size: 0.85rem; display: block; font-weight: 700; color: #406080; margin-bottom: 5px; }
+    input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ced4da; background-color: rgba(248, 250, 255, 0.9); font-size: 1rem; box-sizing: border-box; }
+    
+    button {
+      width: 100%; padding: 14px; font-size: 1.1rem; font-weight: bold; border: none; border-radius: 8px;
+      background: linear-gradient(135deg, #007bff, #0062cc); color: #fff; cursor: pointer;
+      transition: all 0.3s ease; box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+    }
+
+    /* BIGGER RESULT TEXT */
+    .result { 
+        padding: 20px; 
+        border-radius: 12px; 
+        text-align: center; 
+        font-weight: 800; 
+        font-size: 1.4rem; 
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    .high { background: #f8d7da; color: #721c24; border: 2px solid #f5c6cb; } 
+    .low { background: #d4edda; color: #155724; border: 2px solid #c3e6cb; } 
+
+    /* BIGGER MAP */
+    #map {
+      height: 450px; /* Increased map height */
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 15px;
+      border: 2px solid #fff;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="radar-container">
+    <div class="grid-overlay"></div>
+    <div class="search-origin"></div>
+    <div class="ripple"></div>
+    <div class="ripple"></div>
+    <div class="ripple"></div>
+    <div class="ripple"></div>
+    <div class="radar-blip blip-1"></div>
+    <div class="radar-blip blip-2"></div>
+  </div>
+
+  <div class="layout-wrapper">
+    <div class="card" id="card">
+      <a href="/" class="nav-link">&larr; Back</a>
+      <h1>Traffic Accident Risk </h1>
+      <div class="subtitle">AI-based accident risk prediction</div>
+
+      <div class="input-group">
+          <label>Location (City)</label>
+          <input id="city" placeholder="e.g. Bangalore" />
+      </div>
+
+      <div style="display: flex; gap: 15px;">
+          <div class="input-group" style="flex: 1;">
+              <label>Latitude</label>
+              <input id="lat" placeholder="12.9716" />
+          </div>
+          <div class="input-group" style="flex: 1;">
+              <label>Longitude</label>
+              <input id="lon" placeholder="77.5946" />
+          </div>
+      </div>
+
+      <div style="display: flex; gap: 15px;">
+          <div class="input-group" style="flex: 1;">
+              <label>Hour (0-23)</label>
+              <input type="number" id="hour" placeholder="14" />
+          </div>
+          <div class="input-group" style="flex: 1;">
+              <label>Day (1-7)</label>
+              <input type="number" id="day" placeholder="1" />
+          </div>
+      </div>
+      
+      <div class="input-group">
+          <label>Traffic Volume</label>
+          <input type="number" id="traffic" placeholder="1200" />
+      </div>
+
+      <button onclick="predict()">Calculate Risk</button>
+    </div>
+
+    <div class="result-panel">
+      <div id="result" class="result"></div>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <script>
+    let map;
+
+    function predict() {
+      const city = document.getElementById("city").value;
+      const lat = parseFloat(document.getElementById("lat").value);
+      const lon = parseFloat(document.getElementById("lon").value);
+      const hour = parseInt(document.getElementById("hour").value);
+      const day = parseInt(document.getElementById("day").value);
+      const traffic = parseFloat(document.getElementById("traffic").value);
+
+      const resultBox = document.getElementById("result");
+      const card = document.getElementById("card");
+
+      if (isNaN(lat) || isNaN(lon) || isNaN(hour) || isNaN(day) || isNaN(traffic)) {
+        alert("Please fill all fields correctly.");
+        return;
+      }
+
+      // Start animations
+      card.classList.add("move-left");
+
+      resultBox.innerText = "Analyzing traffic data...";
+      resultBox.style.display = "block";
+      resultBox.className = "result";
+
+      fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ city, latitude: lat, longitude: lon, hour, day, traffic_volume: traffic })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const risk = data.accident_risk;
+        const level = data.risk_level;
+
+        resultBox.className = level === "High" ? "result high" : "result low";
+        resultBox.innerText = `${level === "High" ? '⚠️' : '✅'} ${level.toUpperCase()} RISK DETECTED\nProbability Score: ${risk}`;
+
+        if (map) map.remove();
+        map = L.map("map").setView([lat, lon], 14);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+        const color = level === "High" ? "#e74c3c" : "#27ae60";
+        L.circleMarker([lat, lon], { radius: 15, color: "#fff", weight: 3, fillColor: color, fillOpacity: 0.8 }).addTo(map);
+
+        // Crucial for Leaflet in a transitioning container
+        setTimeout(() => { map.invalidateSize(); }, 950);
+      })
+      .catch(err => {
+        resultBox.className = "result high";
+        resultBox.innerText = "Error connecting to prediction server.";
+      });
+    }
+  </script>
+</body>
+</html>

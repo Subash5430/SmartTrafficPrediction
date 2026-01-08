@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SafeRoute AI - Risk Predictor</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f0f7ff; 
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #003366; 
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ===== NAVBAR WITH SLIDING HOVER EFFECT ===== */
+    .navbar {
+      position: fixed; top: 0; left: 0; width: 100%; height: 75px;
+      background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+      border-bottom: 2px solid #007bff;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; z-index: 1000; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      box-sizing: border-box;
+    }
+    .nav-logo { font-size: 1.8rem; font-weight: 800; color: #0056b3; letter-spacing: -1px; }
+    
+    .nav-links { 
+      display: flex; 
+      gap: 10px; 
+      position: relative; 
+      background: rgba(0,0,0,0.05); 
+      padding: 5px; 
+      border-radius: 30px;
+    }
+
+    /* This is the sliding blue pill */
+    .nav-slider {
+      position: absolute;
+      top: 5px; left: 5px;
+      height: calc(100% - 10px);
+      width: 80px; /* Default width */
+      background: #007bff;
+      border-radius: 25px;
+      transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+      z-index: 1;
+    }
+
+    .nav-links a {
+      text-decoration: none; font-size: 0.95rem; font-weight: 700; color: #003366;
+      padding: 10px 22px; border-radius: 25px; position: relative;
+      transition: color 0.4s ease;
+      z-index: 2;
+      display: inline-block;
+    }
+    
+    .nav-links a:hover, .nav-links a.active { color: #fff; }
+
+    /* ===== MOVING BACKGROUND ===== */
+    .radar-container { position: absolute; width: 100%; height: 100%; z-index: 0; }
+    .grid-overlay {
+      position: absolute; width: 200%; height: 200%; top: -50%; left: -50%;
+      background-image: linear-gradient(rgba(0, 123, 255, 0.1) 2px, transparent 2px),
+                        linear-gradient(90deg, rgba(0, 123, 255, 0.1) 2px, transparent 2px);
+      background-size: 80px 80px;
+      animation: moveGrid 15s linear infinite;
+    }
+    @keyframes moveGrid { from { transform: translate(0, 0); } to { transform: translate(80px, 80px); } }
+
+    /* ===== ATTRACTIVE TRAFFIC OFFICER ===== */
+    .officer-station {
+      position: fixed; left: 80px; top: 55%; transform: translateY(-50%);
+      z-index: 500; display: flex; align-items: center;
+    }
+    .officer { width: 100px; height: 240px; position: relative; }
+    
+    .off-head { width: 48px; height: 58px; background: #ffdbac; border-radius: 24px; position: absolute; top: 10px; left: 26px; z-index: 5; border: 1.5px solid #d4a373; box-shadow: inset 0 -5px 10px rgba(0,0,0,0.1); }
+    .off-hat { width: 58px; height: 20px; background: #001a33; border-radius: 12px 12px 0 0; position: absolute; top: -2px; left: 21px; z-index: 6; border-bottom: 4px solid #ffd700; }
+    .off-eye { width: 6px; height: 6px; background: #222; border-radius: 50%; position: absolute; top: 22px; }
+    .off-eye.l { left: 12px; } .off-eye.r { right: 12px; }
+    .off-smile { width: 15px; height: 8px; border-bottom: 2px solid #a07050; border-radius: 50%; position: absolute; top: 38px; left: 16px; }
+    
+    .off-neck { width: 18px; height: 12px; background: #ffdbac; position: absolute; top: 62px; left: 41px; z-index: 4; }
+    .off-body { width: 75px; height: 100px; background: #003366; border-radius: 15px; position: absolute; top: 70px; left: 12px; z-index: 3; border: 1px solid #001a33; }
+    .off-badge { width: 12px; height: 12px; background: #ffd700; border-radius: 3px; position: absolute; top: 15px; right: 15px; box-shadow: 0 0 5px gold; }
+    
+    /* LEFT ARM FIXED (Attached to shoulder) */
+    .off-arm.l { 
+      width: 15px; height: 75px; background: #003366; position: absolute; 
+      top: 75px; left: 2px; transform-origin: top; transform: rotate(20deg); 
+    }
+    
+    /* RIGHT ARM WAVING (Attached to shoulder) */
+    .off-arm.r { 
+      width: 15px; height: 75px; background: #003366; position: absolute; 
+      top: 75px; right: 2px; transform-origin: top; 
+      animation: waveHand 2s infinite ease-in-out; 
+    }
+    @keyframes waveHand { 0%, 100% { transform: rotate(-80deg); } 50% { transform: rotate(-100deg); } }
+    .off-hand { width: 22px; height: 22px; background: #ffdbac; border-radius: 50%; position: absolute; bottom: -12px; left: -3px; }
+    
+    /* VISIBLE MESSAGE BOARD TO THE RIGHT */
+    .prevention-sign {
+      position: absolute; top: -50px; left: 45px; width: 190px; height: 100px;
+      background: #ffff00; border: 5px solid #000; color: #000; font-weight: 900;
+      font-size: 1.15rem; display: flex; align-items: center; justify-content: center;
+      text-align: center; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      transform: rotate(90deg); /* Adjusting for arm rotation */
+      line-height: 1.2;
+    }
+
+    .off-leg { width: 24px; height: 80px; background: #001a33; position: absolute; top: 165px; border-radius: 0 0 8px 8px; }
+    .off-leg.l { left: 20px; } .off-leg.r { left: 56px; }
+
+    /* ===== HERO BOX ===== */
+    .hero-container {
+      position: relative; z-index: 100; text-align: center; max-width: 500px;
+      padding: 50px; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px);
+      border-radius: 40px; border: 2px solid white; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+    }
+    .hero-container h1 { font-size: 2.2rem; margin: 0 0 15px 0; color: #0056b3; }
+    .hero-container p { font-size: 1.1rem; line-height: 1.5; color: #333; margin-bottom: 30px; }
+    .cta-btn {
+      background: #007bff; color: white; text-decoration: none; padding: 15px 40px;
+      border-radius: 35px; font-weight: 800; font-size: 1.1rem; display: inline-block;
+    }
+
+    /* ===== ACCIDENT SCENE ===== */
+    .collision-scene { position: fixed; bottom: 50px; right: 50px; width: 300px; height: 300px; z-index: 200; }
+    .car { position: absolute; width: 100px; height: 45px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+    .car-horizontal { top: 50%; left: -120px; transform: translateY(-50%); background: #0072ff; }
+    .car-vertical { left: 50%; top: -120px; transform: translateX(-50%) rotate(90deg); background: #f00000; }
+    .c-wheel { position: absolute; width: 22px; height: 22px; background: #111; border-radius: 50%; border: 3px solid #666; bottom: -8px; }
+    .c-wheel.l { left: 15px; } .c-wheel.r { right: 15px; }
+    .accident-message { position: absolute; background: #ff0000; color: #fff; padding: 10px 20px; border-radius: 30px; font-size: 1.1rem; font-weight: 900; opacity: 0; white-space: nowrap; z-index: 210; }
+    .ambulance { position: absolute; width: 130px; height: 65px; background: white; border-radius: 10px; right: -250px; top: 120px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); opacity: 0; display: flex; align-items: center; justify-content: center; }
+    .siren-light { position: absolute; top: -15px; left: 40px; width: 40px; height: 15px; background: red; border-radius: 5px; animation: siren-flash 0.3s infinite alternate; }
+    @keyframes siren-flash { from { background: red; box-shadow: 0 0 15px red; } to { background: blue; box-shadow: 0 0 15px blue; } }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-logo">SafeRoute AI</div>
+    <div class="nav-links" id="navContainer">
+      <div class="nav-slider" id="navSlider"></div>
+      <a href="/" class="nav-item ">Home</a>
+      <a href="/predict-page" class="nav-item">Predict</a>
+      <a href="/working" class="nav-item">Working</a>
+      <a href="/model" class="nav-item">Model</a>
+    </div>
+  </nav>
+
+  <div class="radar-container"><div class="grid-overlay"></div></div>
+
+  <div class="officer-station">
+    <div class="officer">
+      <div class="off-hat"></div>
+      <div class="off-head">
+        <div class="off-eye l"></div><div class="off-eye r"></div>
+        <div class="off-smile"></div>
+        <div class="off-ear l"></div><div class="off-ear r"></div>
+      </div>
+      <div class="off-neck"></div>
+      <div class="off-body"><div class="off-badge"></div></div>
+      <div class="off-arm l"><div class="off-hand"></div></div>
+      <div class="off-arm r">
+        <div class="off-hand">
+          <div class="prevention-sign">STAY ALERT!<br>DRIVE<br>SAFELY</div>
+        </div>
+      </div>
+      <div class="off-leg l"></div><div class="off-leg r"></div>
+    </div>
+  </div>
+
+  <div class="hero-container">
+    <h1>AI Powered Accident Risk Prediction</h1>
+    <p>Using traffic and location data to predict accident probability in real time for safer travel.</p>
+    <a href="/predict-page" class="cta-btn">Launch Prediction →</a>
+  </div>
+
+  <div class="collision-scene">
+    <div class="car car-horizontal"><div class="c-wheel l"></div><div class="c-wheel r"></div></div>
+    <div class="car car-vertical"><div class="c-wheel l"></div><div class="c-wheel r"></div></div>
+    <div class="accident-message">⚠ Accident Occured !!</div>
+    <div class="ambulance">
+      <div class="siren-light"></div>
+      <div style="width: 30px; height: 30px; background: red; clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);"></div>
+      <div class="c-wheel l" style="bottom: -10px;"></div>
+      <div class="c-wheel r" style="bottom: -10px;"></div>
+    </div>
+  </div>
+
+  <script>
+    // --- NAV SLIDER LOGIC ---
+    const navItems = document.querySelectorAll('.nav-item');
+    const slider = document.getElementById('navSlider');
+
+    function moveSlider(element) {
+      slider.style.left = element.offsetLeft + 'px';
+      slider.style.width = element.offsetWidth + 'px';
+    }
+
+    // Set initial position to active element
+    window.onload = () => moveSlider(document.querySelector('.nav-item.active'));
+
+    navItems.forEach(item => {
+      item.addEventListener('mouseenter', (e) => moveSlider(e.target));
+      item.addEventListener('mouseleave', () => {
+        const active = document.querySelector('.nav-item.active');
+        moveSlider(active);
+      });
+      item.addEventListener('click', (e) => {
+        navItems.forEach(i => i.classList.remove('active'));
+        e.target.classList.add('active');
+      });
+    });
+
+    // --- ACCIDENT ANIMATION LOGIC ---
+    const carH = document.querySelector(".car-horizontal");
+    const carV = document.querySelector(".car-vertical");
+    const amb = document.querySelector(".ambulance");
+    const message = document.querySelector(".accident-message");
+
+    let posH = -150; let posV = -150;
+    const crashPoint = 100;
+
+    function reset() {
+      posH = -150; posV = -150;
+      carH.style.left = posH + "px"; carV.style.top = posV + "px";
+      carH.style.transform = "translateY(-50%) rotate(0deg)";
+      carV.style.transform = "translateX(-50%) rotate(90deg)";
+      message.style.opacity = "0"; amb.style.opacity = "0";
+      amb.style.right = "-250px";
+    }
+
+    function runAnimation() {
+      const loop = setInterval(() => {
+        if (posH < crashPoint) posH += 3.5;
+        if (posV < crashPoint) posV += 3.5;
+        carH.style.left = posH + "px"; carV.style.top = posV + "px";
+
+        if (posH >= crashPoint && posV >= crashPoint) {
+          clearInterval(loop);
+          carH.style.transform = "translateY(-50%) rotate(15deg)";
+          carV.style.transform = "translateX(-50%) rotate(75deg)";
+          message.style.opacity = "1"; message.style.left = "40px"; message.style.top = "60px";
+
+          setTimeout(() => {
+            amb.style.transition = "all 0.8s ease-out";
+            amb.style.opacity = "1"; amb.style.right = "40px";
+          }, 600);
+
+          setTimeout(() => {
+            amb.style.transition = "none"; reset(); runAnimation();
+          }, 4500);
+        }
+      }, 20);
+    }
+
+    reset();
+    runAnimation();
+  </script>
+</body>
+</html>

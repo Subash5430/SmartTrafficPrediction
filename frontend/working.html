@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SafeRoute | How Risk Is Decided</title>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background-color: #f0f7ff;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #003366;
+      /* Changed from hidden to auto to allow scrolling */
+      overflow-y: auto; 
+      position: relative;
+      padding: 40px 0; /* Added padding so card doesn't touch screen edges on small screens */
+    }
+
+    /* Custom Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f0f7ff;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #b3d7ff;
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #007bff;
+    }
+
+    /* ===== Radar Background ===== */
+    .radar-container {
+      position: fixed; /* Changed to fixed so it stays behind while scrolling */
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .grid-overlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-image:
+        linear-gradient(rgba(0, 123, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 123, 255, 0.08) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    .origin {
+      width: 20px;
+      height: 20px;
+      background: rgba(0, 123, 255, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 0 30px rgba(0, 123, 255, 1);
+      animation: pulse 4s infinite;
+      z-index: 2;
+    }
+
+    .ripple {
+      position: absolute;
+      border: 2px solid rgba(0, 110, 255, 0.6);
+      border-radius: 50%;
+      width: 0;
+      height: 0;
+      animation: ripple 8s infinite;
+      opacity: 0;
+    }
+
+    .ripple:nth-child(3) { animation-delay: 0s; }
+    .ripple:nth-child(4) { animation-delay: 2s; }
+    .ripple:nth-child(5) { animation-delay: 4s; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 0.7; }
+      50% { transform: scale(1.6); opacity: 1; }
+    }
+
+    @keyframes ripple {
+      0% { width: 0; height: 0; opacity: 0; }
+      10% { opacity: 1; }
+      100% { width: 140vmax; height: 140vmax; opacity: 0; }
+    }
+
+    /* ===== Card ===== */
+    .card {
+      position: relative;
+      z-index: 10;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(8px);
+      width: 90%;
+      max-width: 820px;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+      animation: slideUp 1s ease;
+      margin: auto; /* Centers the card when scrolling */
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    h1 {
+      text-align: center;
+      color: #0056b3;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 1rem;
+      color: #557799;
+      margin-bottom: 30px;
+    }
+
+    .section {
+      margin-bottom: 25px;
+      animation: fadeIn 1.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .section h2 {
+      color: #007bff;
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+
+    .section p {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #003366;
+    }
+
+    .risk-boxes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Responsive grid */
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .risk {
+      padding: 18px;
+      border-radius: 14px;
+      font-weight: 600;
+      text-align: center;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      animation: float 4s infinite ease-in-out;
+    }
+
+    .low { background: #d4edda; color: #155724; }
+    .medium { background: #fff3cd; color: #856404; animation-delay: 1s; }
+    .high { background: #f8d7da; color: #721c24; animation-delay: 2s; }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .back {
+      display: block;
+      margin-top: 30px;
+      text-align: center;
+      font-weight: 600;
+      color: #007bff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="radar-container">
+    <div class="grid-overlay"></div>
+    <div class="origin"></div>
+    <div class="ripple"></div>
+    <div class="ripple"></div>
+    <div class="ripple"></div>
+  </div>
+
+  <div class="card">
+    <h1>How the Risk Is Decided</h1>
+    
+    <div class="subtitle">
+      Understanding why a location is classified as Low, Medium, or High risk
+    </div>
+
+    <div class="section">
+      <h2>1. Real-World Conditions</h2>
+      <p>
+        The system evaluates traffic conditions based on where the accident might occur,
+        how many vehicles are present, and the time of day. These factors reflect
+        real-world human activity patterns.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>2. Human Movement Patterns</h2>
+      <p>
+        Certain times of the day naturally involve higher movement of people and vehicles.
+        Morning office hours, evening returns, and weekends typically show increased road usage,
+        which raises the likelihood of accidents.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>3. Location Sensitivity</h2>
+      <p>
+        Areas with higher population density, commercial zones, junction-heavy roads,
+        and urban centers experience more interactions between vehicles, pedestrians,
+        and road infrastructure, increasing risk.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>4. Final Risk Interpretation</h2>
+
+      <div class="risk-boxes">
+        <div class="risk low">
+          🟢 LOW RISK<br><br>
+          Light traffic<br>
+          Off-peak hours<br>
+          Less crowd movement
+        </div>
+
+        <div class="risk medium">
+          🟡 MEDIUM RISK<br><br>
+          Moderate traffic<br>
+          Partial peak activity<br>
+          Mixed road usage
+        </div>
+
+        <div class="risk high">
+          🔴 HIGH RISK<br><br>
+          Heavy traffic<br>
+          Peak hours<br>
+          Dense population movement
+        </div>
+      </div>
+    </div>
+
+    <a href="/predict-page" class="back">← Back to Prediction</a>
+  </div>
+
+</body>
+</html>
